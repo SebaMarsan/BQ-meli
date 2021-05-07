@@ -1,3 +1,10 @@
+CREATE OR REPLACE TABLE `meli-bi-data.EXPLOTACION.DM_MKP_ORDERS_MSTR`
+PARTITION BY FECHA_SERVER 
+CLUSTER BY SIT_SITE_ID, VERTICAL, CAT_L1_ID
+AS (
+
+
+
 WITH ORDERS AS (
 
 select
@@ -49,7 +56,7 @@ from `meli-bi-data.WHOWNER.BT_ORD_ORDERS` as o
 
 where 1=1
 and o.SIT_SITE_ID = 'MLC'
-and o.ORD_CLOSED_DTTM between  cast('2021-01-05' as timestamp) and cast('2021-01-08' as timestamp)-- cast(TIMESTAMP_SUB(CURRENT_DATE(), INTERVAL 46 DAY) as timestamp)
+and o.ORD_CLOSED_DTTM >= cast('2020-01-01' as timestamp)-- cast(TIMESTAMP_SUB(CURRENT_DATE(), INTERVAL 46 DAY) as timestamp)
 and o.ORD_GMV_FLG is true
 
 GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19
@@ -58,17 +65,6 @@ GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19
 
  SELECT SIT_SITE_ID SIT_SITE_ID
 , ITE_ITEM_ID ITE_ITEM_ID
--- , ITE_ITEM_TITLE ITEM_TITLE
-, ITE_ITEM_QUANTITY_AVAILABLE STOCK
-, ITE_ITEM_STATUS STATUS
--- , ITE_ITEM_CONDITION CONDITION
-, CASE WHEN ITE_ITEM_SHIPPING_PAYMENT_TYPE_ID = 'free_shipping' THEN TRUE ELSE FALSE END FS_ITEM
-, CASE WHEN SIT_SITE_ID = 'MLC' THEN TRUE
-   WHEN SIT_SITE_ID = 'MLU' AND ITE_ITEM_LISTING_TYPE_ID_NW <> 'free' THEN TRUE
-   WHEN SIT_SITE_ID = 'MLV' THEN FALSE
-   WHEN ITE_ITEM_LISTING_TYPE_ID_NW = 'gold_pro' THEN TRUE 
-   ELSE FALSE 
-  END PSJ_ITEM
 , ITE_ITEM_CATALOG_PRODUCT_ID PRODUCT_ID
 , ITE_ITEM_THUMBNAIL THUMBNAIL
 , ITE_ITEM_PERMALINK PERMALINK
@@ -78,6 +74,18 @@ FROM `meli-bi-data.WHOWNER.LK_ITE_ITEMS`
 WHERE IS_TEST = FALSE
 AND SIT_SITE_ID IN ('MLC')
 AND ITE_ITEM_ID IN (SELECT ITE_ITEM_ID FROM ORDERS)
+
+), ITEM_ATTRS AS (
+ SELECT I.SIT_SITE_ID
+, ITE_ITEM_ID
+, MIN(CASE WHEN ATTR.ID = 'BRAND' THEN ATTR.VALUE_NAME END) AS BRAND
+, MIN(CASE WHEN ATTR.ID = 'SELLER_SKU' THEN ATTR.VALUE_NAME END) AS SKU
+  FROM `meli-bi-data.WHOWNER.LK_ITE_ITEMS` I, UNNEST(ITE_ITEM_ATTRIBUTES) AS ATTR
+  WHERE IS_TEST = FALSE
+  AND ITE_ITEM_ID IN (SELECT ITE_ITEM_ID FROM ORDERS)
+  AND SIT_SITE_ID IN ('MLA','MLC','MLB','MLM','MLU','MCO','MPE','MLV')
+  AND ATTR.ID IN ('BRAND','SELLER_SKU')
+  GROUP BY 1,2
 
 ), DOMAINS as (
 
@@ -114,7 +122,19 @@ trim(s.SIT_SITE_ID) as SIT_SITE_ID
 
 FROM `meli-bi-data.WHOWNER.LK_MKP_SEGMENTO_SELLERS` as s
 
-), ORDERS_DETAILS as (
+), PRICES AS (
+      SELECT I.SIT_SITE_ID,
+        I.ITE_ITEM_ID,
+        MIN(ITE_ITEM_PRICE_AMOUNT) PRICE,
+        MIN(ITE_ITEM_PRICE_REGULAR_AMOUNT) REGULAR_PRICE
+      FROM `meli-bi-data.WHOWNER.LK_ITE_ITEM_PRICES` I
+      WHERE ITE_ITEM_PRICE_API_STATUS = 'ACTIVE'
+        AND (TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 4 HOUR) BETWEEN ITE_ITEM_PRICE_START_TIME_DTTM AND ITE_ITEM_PRICE_END_TIME_DTTM
+          OR ITE_ITEM_PRICE_TYPE = 'standard')
+        AND ITE_ITEM_ID IN (SELECT ITE_ITEM_ID FROM ORDERS)
+        AND SIT_SITE_ID IN ('MLC')
+      GROUP BY 1,2
+    ), ORDERS_DETAILS as (
 
 select 
 o.*
@@ -130,22 +150,27 @@ o.*
    when SEGMENTO_FIX in ('1P','PL','CBT') then SEGMENTO_FIX 
    ELSE '3P' 
   END as BU
-, i.stock
-, i.status as item_status
-, i.fs_item
-, i.PSJ_ITEM
 , i.PRODUCT_ID
 , i.PERMALINK
--- , case
---   when  (s.segmento_seller_detail in ('PRIVATE LABEL','FIRST PARTY') or s.segmento = 'TO') THEN o.OFFICIAL_STORE_ID
---   else null
---  end as STORE_ID
+, p.PRICE
+, p.REGULAR_PRICE
+, a.BRAND
+, a.SKU
+, DATE_TRUNC(o.FECHA_SERVER, WEEK(MONDAY)) as WEEK_SERVER
+, DATE_TRUNC(o.FECHA_SITE, WEEK(MONDAY)) as WEEK_SITE
+
 
 FROM ORDERS as o
 left join ITEMS as i on o.sit_site_id = i.sit_site_id and o.ite_item_id = i.ite_item_id
 left join DOMAINS as d on i.sit_site_id = d.sit_site_id and i.DOM_DOMAIN_ID = d.DOM_DOMAIN_ID
 left join SEGMENTS as s on o.sit_site_id = s.sit_site_id and o.cus_cust_id_sel = s.cus_cust_id_sel
-
+left join PRICES as p on o.sit_site_id = p.sit_site_id and o.ite_item_id = p.ite_item_id
+left join ITEM_ATTRS as a on o.sit_site_id = a.sit_site_id and o.ite_item_id = a.ite_item_id
 )
 
 select * from ORDERS_DETAILS
+
+
+)
+
+
