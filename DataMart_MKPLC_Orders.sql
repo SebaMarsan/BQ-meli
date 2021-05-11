@@ -39,6 +39,7 @@ o.sit_site_id
   WHEN ORD_SHIPPING.LOGISTIC_TYPE = 'xd_drop_off' then 'XD'
   WHEN ORD_SHIPPING.LOGISTIC_TYPE = 'cross_docking' then 'XD'
   WHEN ORD_SHIPPING.LOGISTIC_TYPE = 'fulfillment' then 'FBM'
+  WHEN ORD_SHIPPING.LOGISTIC_TYPE = 'self_service' then 'FLEX'
   ELSE 'Otro' 
 end as LOGISTIC_TYPE
 
@@ -65,6 +66,17 @@ GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19
 
  SELECT SIT_SITE_ID SIT_SITE_ID
 , ITE_ITEM_ID ITE_ITEM_ID
+-- , ITE_ITEM_TITLE ITEM_TITLE
+-- ,- ITE_ITEM_QUANTITY_AVAILABLE STOCK
+-- , ITE_ITEM_STATUS STATUS
+-- , ITE_ITEM_CONDITION CONDITION
+-- , CASE WHEN ITE_ITEM_SHIPPING_PAYMENT_TYPE_ID = 'free_shipping' THEN TRUE ELSE FALSE END FS_ITEM
+-- , CASE WHEN SIT_SITE_ID = 'MLC' THEN TRUE
+--    WHEN SIT_SITE_ID = 'MLU' AND ITE_ITEM_LISTING_TYPE_ID_NW <> 'free' THEN TRUE
+--   WHEN SIT_SITE_ID = 'MLV' THEN FALSE
+--   WHEN ITE_ITEM_LISTING_TYPE_ID_NW = 'gold_pro' THEN TRUE 
+--   ELSE FALSE 
+--  END PSJ_ITEM
 , ITE_ITEM_CATALOG_PRODUCT_ID PRODUCT_ID
 , ITE_ITEM_THUMBNAIL THUMBNAIL
 , ITE_ITEM_PERMALINK PERMALINK
@@ -150,6 +162,10 @@ o.*
    when SEGMENTO_FIX in ('1P','PL','CBT') then SEGMENTO_FIX 
    ELSE '3P' 
   END as BU
+-- , i.stock
+-- , i.status as item_status
+-- , i.fs_item
+-- , i.PSJ_ITEM
 , i.PRODUCT_ID
 , i.PERMALINK
 , p.PRICE
@@ -158,7 +174,10 @@ o.*
 , a.SKU
 , DATE_TRUNC(o.FECHA_SERVER, WEEK(MONDAY)) as WEEK_SERVER
 , DATE_TRUNC(o.FECHA_SITE, WEEK(MONDAY)) as WEEK_SITE
-
+-- , case
+--   when  (s.segmento_seller_detail in ('PRIVATE LABEL','FIRST PARTY') or s.segmento = 'TO') THEN o.OFFICIAL_STORE_ID
+--   else null
+--  end as STORE_ID
 
 FROM ORDERS as o
 left join ITEMS as i on o.sit_site_id = i.sit_site_id and o.ite_item_id = i.ite_item_id
