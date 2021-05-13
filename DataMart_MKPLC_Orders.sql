@@ -52,6 +52,7 @@ end as LOGISTIC_TYPE
 , SUM(o.ORD_ITEM.QTY) AS SI
 
 , count(distinct ord_order_id) as TXS
+-- , o.ORD_ITEM.unit_price as 
 
 from `meli-bi-data.WHOWNER.BT_ORD_ORDERS` as o
 
@@ -60,7 +61,7 @@ and o.SIT_SITE_ID = 'MLC'
 and o.ORD_CLOSED_DTTM >= cast('2020-01-01' as timestamp)-- cast(TIMESTAMP_SUB(CURRENT_DATE(), INTERVAL 46 DAY) as timestamp)
 and o.ORD_GMV_FLG is true
 
-GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19 -- ,20
 
 ), ITEMS as (
 
@@ -134,11 +135,14 @@ trim(s.SIT_SITE_ID) as SIT_SITE_ID
 
 FROM `meli-bi-data.WHOWNER.LK_MKP_SEGMENTO_SELLERS` as s
 
-), PRICES AS (
+),
+/*
+ PRICES AS (
       SELECT I.SIT_SITE_ID,
         I.ITE_ITEM_ID,
-        MIN(ITE_ITEM_PRICE_AMOUNT) PRICE,
-        MIN(ITE_ITEM_PRICE_REGULAR_AMOUNT) REGULAR_PRICE
+        MIN(ITE_ITEM_PRICE_AMOUNT) PRICE_ACTUAL,
+        MIN(ITE_ITEM_PRICE_REGULAR_AMOUNT) REGULAR_PRICE_ACTUAL
+
       FROM `meli-bi-data.WHOWNER.LK_ITE_ITEM_PRICES` I
       WHERE ITE_ITEM_PRICE_API_STATUS = 'ACTIVE'
         AND (TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 4 HOUR) BETWEEN ITE_ITEM_PRICE_START_TIME_DTTM AND ITE_ITEM_PRICE_END_TIME_DTTM
@@ -146,7 +150,9 @@ FROM `meli-bi-data.WHOWNER.LK_MKP_SEGMENTO_SELLERS` as s
         AND ITE_ITEM_ID IN (SELECT ITE_ITEM_ID FROM ORDERS)
         AND SIT_SITE_ID IN ('MLC')
       GROUP BY 1,2
-    ), ORDERS_DETAILS as (
+    ), 
+  */
+    ORDERS_DETAILS as (
 
 select 
 o.*
@@ -168,8 +174,8 @@ o.*
 -- , i.PSJ_ITEM
 , i.PRODUCT_ID
 , i.PERMALINK
-, p.PRICE
-, p.REGULAR_PRICE
+-- , p.PRICE_ACTUAL
+-- , p.REGULAR_PRICE_ACTUAL
 , a.BRAND
 , a.SKU
 , DATE_TRUNC(o.FECHA_SERVER, WEEK(MONDAY)) as WEEK_SERVER
@@ -183,7 +189,7 @@ FROM ORDERS as o
 left join ITEMS as i on o.sit_site_id = i.sit_site_id and o.ite_item_id = i.ite_item_id
 left join DOMAINS as d on i.sit_site_id = d.sit_site_id and i.DOM_DOMAIN_ID = d.DOM_DOMAIN_ID
 left join SEGMENTS as s on o.sit_site_id = s.sit_site_id and o.cus_cust_id_sel = s.cus_cust_id_sel
-left join PRICES as p on o.sit_site_id = p.sit_site_id and o.ite_item_id = p.ite_item_id
+-- left join PRICES as p on o.sit_site_id = p.sit_site_id and o.ite_item_id = p.ite_item_id
 left join ITEM_ATTRS as a on o.sit_site_id = a.sit_site_id and o.ite_item_id = a.ite_item_id
 )
 
